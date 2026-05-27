@@ -1,0 +1,34 @@
+name: Build Tweak
+
+on:
+  push:
+    branches: [ main, master ]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: macos-latest
+    
+    steps:
+      - name: 获取代码
+        uses: actions/checkout@v4
+      
+      - name: 安装 Theos
+        run: |
+          git clone --depth 1 https://github.com/theos/theos.git $HOME/theos
+          echo "$HOME/theos/bin" >> $GITHUB_PATH
+          curl -L -o $HOME/theos/sdk.zip https://github.com/theos/sdks/archive/master.zip
+          unzip -q $HOME/theos/sdk.zip -d $HOME/theos/sdks
+          mv $HOME/theos/sdks/sdks-master/* $HOME/theos/sdks/
+          rm -rf $HOME/theos/sdks/sdks-master
+      
+      - name: 编译插件
+        run: |
+          make clean
+          make FINALPACKAGE=1
+      
+      - name: 上传编译产物
+        uses: actions/upload-artifact@v4
+        with:
+          name: URLRedirect_Plugin
+          path: .theos/obj/*.dylib
