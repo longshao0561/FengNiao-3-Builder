@@ -19,27 +19,33 @@ jobs:
           echo "THEOS=$HOME/theos" >> $GITHUB_ENV
           echo "$HOME/theos/bin" >> $GITHUB_PATH
 
-      - name: 安装 ldid 签名工具
-        run: |
-          # 安装 ldid（用于签名 dylib）
-          curl -L -o $HOME/ldid https://github.com/ProcursusTeam/ldid/raw/master/ldid
-          chmod +x $HOME/ldid
-          sudo mv $HOME/ldid /usr/local/bin/
-          echo "/usr/local/bin" >> $GITHUB_PATH
-          # 验证安装
-          ldid --version
-
-      - name: 手动下载 SDK
+      - name: 使用官方 update-theos 修复
         run: |
           export THEOS=$HOME/theos
+          # 运行官方更新脚本（会自动下载 SDK）
+          $THEOS/bin/update-theos
+          # 如果失败，尝试用 make
+          cd $THEOS
+          make update-theos || true
+
+      - name: 手动下载可用的 SDK
+        run: |
+          export THEOS=$HOME/theos
+          # 使用 GitHub 上可用的 SDK 源
           curl -L -o $THEOS/sdks.zip https://github.com/theos/sdks/archive/master.zip
           unzip -q $THEOS/sdks.zip -d $THEOS/
           mv $THEOS/sdks-master/* $THEOS/sdks/
           rm -rf $THEOS/sdks-master $THEOS/sdks.zip
+          
+          # 创建 vendor 目录
           mkdir -p $THEOS/vendor/include $THEOS/vendor/lib
+          
+          # 设置 SDK 版本
           echo "SDKVERSION=13.5" >> $GITHUB_ENV
           echo "TARGET=iphone:latest:13.5" >> $GITHUB_ENV
+          
           echo "SDK 安装完成"
+          ls -la $THEOS/sdks/
 
       - name: 编译插件
         run: |
