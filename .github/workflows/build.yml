@@ -15,20 +15,65 @@ jobs:
       
       - name: 安装 Theos
         run: |
-          git clone --depth 1 https://github.com/theos/theos.git $HOME/theos
-          echo "$HOME/theos/bin" >> $GITHUB_PATH
-          curl -L -o $HOME/theos/sdk.zip https://github.com/theos/sdks/archive/master.zip
-          unzip -q $HOME/theos/sdk.zip -d $HOME/theos/sdks
-          mv $HOME/theos/sdks/sdks-master/* $HOME/theos/sdks/
-          rm -rf $HOME/theos/sdks/sdks-master
+          # 安装 Theos 到指定目录
+          git clone --depth 1 https://github.com/theos/theos.git /opt/theos
+          echo "export THEOS=/opt/theos" >> $GITHUB_ENV
+          echo "/opt/theos/bin" >> $GITHUB_PATH
+          
+          # 下载 SDK
+          curl -L -o /opt/theos/sdks.zip https://github.com/theos/sdks/archive/master.zip
+          unzip -q /opt/theos/sdks.zip -d /opt/theos/sdks
+          mv /opt/theos/sdks/sdks-master/* /opt/theos/sdks/
+          rm -rf /opt/theos/sdks/sdks-master
+          
+          # 设置 SDK 路径
+          echo "export SDKVERSION=14.5" >> $GITHUB_ENV
+          echo "export TARGET=iphone:latest:14.0" >> $GITHUB_ENV
+      
+      - name: 验证 Theos 安装
+        run: |
+          ls -la /opt/theos/
+          ls -la /opt/theos/bin/
+          echo "THEOS=$THEOS"
+      
+      - name: 修复 Makefile
+        run: |
+          # 替换 Makefile 中的路径变量
+          sed -i 's|include $(THEOS)/makefiles/common.mk|include $(THEOS)/makefiles/common.mk|g' Makefile
+          sed -i 's|include $(THEOS_MAKE_PATH)/tweak.mk|include $(THEOS)/makefiles/tweak.mk|g' Makefile
+          
+          # 如果 THEOS 环境变量没有生效，直接写入 Makefile
+          echo "THEOS = /opt/theos" >> Makefile
+          echo "THEOS_MAKE_PATH = /opt/theos/makefiles" >> Makefile
+          
+          cat Makefile
       
       - name: 编译插件
         run: |
+          cd $GITHUB_WORKSPACE
+          export THEOS=/opt/theos
+          export THEOS_MAKE_PATH=/opt/theos/makefiles
           make clean
           make FINALPACKAGE=1
       
-      - name: 上传编译产物
+      - name: 查找编译产物
+        run: |
+          echo "查找 .dylib 文件..."
+          find . -name "*.dylib" -type f
+          echo "查找 .deb 文件..."
+          find . -name "*.deb" -type f
+      
+      - name: 上传编译产物 (dylib)
         uses: actions/upload-artifact@v4
         with:
-          name: URLRedirect_Plugin
-          path: .theos/obj/*.dylib
+          name: URLRedirect_Plugin_dylib
+          path: |
+            **/*.dylib
+            !**/*.stripped*
+      
+      - name: 上传编译产物 (deb)
+        uses: actions/upload-artifact@v4
+        with:
+          name: URLRedirect_Plugin_deb
+          path: |
+            **/*.deb
