@@ -7,95 +7,18 @@ on:
 
 jobs:
   build:
-    runs-on: macos-latest
-    
+    runs-on: ubuntu-latest
     steps:
       - name: 获取代码
         uses: actions/checkout@v4
-      
-      - name: 安装 Theos 到用户目录
-        run: |
-          # 安装到当前用户目录（有写入权限）
-          git clone --depth 1 https://github.com/theos/theos.git $HOME/theos
-          echo "$HOME/theos/bin" >> $GITHUB_PATH
-          echo "THEOS=$HOME/theos" >> $GITHUB_ENV
-          
-          # 下载 SDK
-          curl -L -o $HOME/theos/sdks.zip https://github.com/theos/sdks/archive/master.zip
-          unzip -q $HOME/theos/sdks.zip -d $HOME/theos/sdks
-          mv $HOME/theos/sdks/sdks-master/* $HOME/theos/sdks/
-          rm -rf $HOME/theos/sdks/sdks-master $HOME/theos/sdks.zip
-          
-          # 设置 SDK 版本
-          echo "SDKVERSION=14.5" >> $GITHUB_ENV
-          
-          echo "Theos 安装完成，路径: $HOME/theos"
-          ls -la $HOME/theos/
-      
-      - name: 创建 Makefile
-        run: |
-          cat > Makefile << 'EOF'
-          # Theos 路径
-          export THEOS = $(HOME)/theos
-          export THEOS_MAKE_PATH = $(THEOS)/makefiles
-          
-          # 架构
-          ARCHS = arm64 arm64e
-          
-          # 目标 iOS 版本
-          TARGET = iphone:latest:14.0
-          
-          # 插件名称
-          TWEAK_NAME = urlredirect
-          
-          # 源文件
-          urlredirect_FILES = Tweak.xm
-          
-          # 编译标志
-          urlredirect_CFLAGS = -fobjc-arc
-          
-          # 包含 Theos 构建文件
-          include $(THEOS_MAKE_PATH)/common.mk
-          include $(THEOS_MAKE_PATH)/tweak.mk
-          EOF
-          
-          echo "Makefile 已创建"
-          cat Makefile
-      
-      - name: 验证文件
-        run: |
-          echo "当前目录文件:"
-          ls -la
-          echo ""
-          echo "Tweak.xm 内容:"
-          head -20 Tweak.xm
-      
-      - name: 编译插件
-        run: |
-          export THEOS=$HOME/theos
-          export THEOS_MAKE_PATH=$HOME/theos/makefiles
-          
-          # 清理并编译
-          make clean
-          make FINALPACKAGE=1
-      
-      - name: 查找编译产物
-        run: |
-          echo "查找所有 .dylib 文件..."
-          find . -name "*.dylib" -type f 2>/dev/null || echo "未找到 .dylib"
-          echo ""
-          echo "查找所有 .deb 文件..."
-          find . -name "*.deb" -type f 2>/dev/null || echo "未找到 .deb"
-          echo ""
-          echo "查找 .theos 目录..."
-          ls -la .theos/ 2>/dev/null || echo ".theos 目录不存在"
-          ls -la .theos/obj/ 2>/dev/null || echo "obj 目录不存在"
-      
-      - name: 上传编译产物
+
+      - name: 编译插件 (使用 Theos Action)
+        uses: i0b0t/theos-action@v1
+        with:
+          package-name: URLRedirect
+
+      - name: 上传 .dylib 文件
         uses: actions/upload-artifact@v4
         with:
           name: URLRedirect_Plugin
-          path: |
-            **/*.dylib
-            **/*.deb
-            !**/*.stripped*
+          path: .theos/obj/*.dylib
