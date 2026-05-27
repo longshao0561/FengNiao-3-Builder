@@ -1,4 +1,4 @@
-name: Build Tweak
+name: Build Tweak on macOS
 
 on:
   push:
@@ -7,81 +7,59 @@ on:
 
 jobs:
   build:
-    runs-on: ubuntu-latest
+    runs-on: macos-latest
     
     steps:
       - name: 获取代码
         uses: actions/checkout@v4
 
-      - name: 安装编译工具
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y git curl unzip build-essential
-
       - name: 安装 Theos
         run: |
           # 克隆 Theos
-          git clone --depth 1 https://github.com/theos/theos.git /opt/theos
-          echo "THEOS=/opt/theos" >> $GITHUB_ENV
-          echo "/opt/theos/bin" >> $GITHUB_PATH
+          git clone --depth 1 https://github.com/theos/theos.git $HOME/theos
+          echo "THEOS=$HOME/theos" >> $GITHUB_ENV
+          echo "$HOME/theos/bin" >> $GITHUB_PATH
+          
+          # 更新 Theos
+          $HOME/theos/bin/update-theos
+          
+          # 设置 SDK 路径
+          echo "SDKVERSION=14.5" >> $GITHUB_ENV
 
-      - name: 运行 update-theos 补全文件
+      - name: 验证环境
         run: |
-          export THEOS=/opt/theos
-          # 运行更新脚本
-          /opt/theos/bin/update-theos
-          # 如果上面命令失败，尝试用 make 更新
-          cd /opt/theos
-          make update-theos || true
-
-      - name: 手动下载 SDK（如果 update-theos 失败）
-        run: |
-          export THEOS=/opt/theos
-          # 手动下载 SDK
-          curl -L -o /tmp/sdks.zip https://github.com/theos/sdks/archive/master.zip
-          unzip -q /tmp/sdks.zip -d /tmp/
-          mkdir -p $THEOS/sdks
-          cp -r /tmp/sdks-master/* $THEOS/sdks/
-          rm -rf /tmp/sdks-master /tmp/sdks.zip
-          # 创建 vendor 目录
-          mkdir -p $THEOS/vendor/include $THEOS/vendor/lib
-          echo "SDK 安装完成"
-          ls -la $THEOS/sdks/
-
-      - name: 验证 Theos 安装
-        run: |
-          export THEOS=/opt/theos
-          echo "THEOS 目录内容:"
+          export THEOS=$HOME/theos
+          echo "THEOS 路径: $THEOS"
           ls -la $THEOS/
           echo ""
-          echo "SDK 目录内容:"
+          echo "SDK 目录:"
           ls -la $THEOS/sdks/ || echo "SDK 目录不存在"
           echo ""
-          echo "vendor 目录内容:"
-          ls -la $THEOS/vendor/ || echo "vendor 目录不存在"
+          echo "toolchain 目录:"
+          ls -la $THEOS/toolchain/ || echo "toolchain 目录不存在"
 
       - name: 编译插件
         run: |
-          export THEOS=/opt/theos
+          export THEOS=$HOME/theos
           make clean
           make FINALPACKAGE=1
 
-      - name: 查找编译产物
+      - name: 查找并上传 .dylib
         run: |
-          echo "查找 .dylib 文件..."
-          find . -name "*.dylib" -type f 2>/dev/null || echo "未找到 .dylib"
-          echo ""
-          echo "查找 .deb 文件..."
-          find . -name "*.deb" -type f 2>/dev/null || echo "未找到 .deb"
-          echo ""
-          echo "检查 .theos 目录..."
-          ls -la .theos/ 2>/dev/null || echo ".theos 目录不存在"
-          ls -la .theos/obj/ 2>/dev/null || echo "obj 目录不存在"
+          echo "查找编译产物..."
+          find . -name "*.dylib" -type f
+          find . -name "*.deb" -type f
+          
+          # 创建输出目录
+          mkdir -p output
+          find . -name "*.dylib" -exec cp {} output/ \; 2>/dev/null || true
+          find . -name "*.deb" -exec cp {} output/ \; 2>/dev/null || true
+          
+          echo "输出目录内容:"
+          ls -la output/
 
-      - name: 上传编译产物
+      - name: 上传插件
         uses: actions/upload-artifact@v4
         with:
           name: URLRedirect_Plugin
-          path: |
-            **/*.dylib
-            **/*.deb
+          path: output/
