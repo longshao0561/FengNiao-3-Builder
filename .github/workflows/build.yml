@@ -19,31 +19,21 @@ jobs:
           echo "THEOS=$HOME/theos" >> $GITHUB_ENV
           echo "$HOME/theos/bin" >> $GITHUB_PATH
 
-      - name: 手动下载并配置 SDK
+      - name: 让 Theos 自动配置环境
         run: |
           export THEOS=$HOME/theos
-          
-          # 创建必要目录
-          mkdir -p $THEOS/sdks
+          # 创建空的 vendor 目录，让 Theos 自己填充
           mkdir -p $THEOS/vendor/include
           mkdir -p $THEOS/vendor/lib
-          
-          # 下载 SDK (使用可靠源)
-          curl -L -o /tmp/iPhoneOS.sdk.zip https://github.com/xybp888/iOS-SDKs/raw/master/iPhoneOS14.5.sdk.zip
-          unzip -q /tmp/iPhoneOS.sdk.zip -d $THEOS/sdks/
-          mv $THEOS/sdks/iPhoneOS.sdk $THEOS/sdks/iPhoneOS14.5.sdk
-          
-          # 设置 SDK 路径
-          echo "SDKVERSION=14.5" >> $GITHUB_ENV
-          echo "TARGET=iphone:latest:14.5" >> $GITHUB_ENV
-          
-          # 验证
-          ls -la $THEOS/sdks/
+          # 运行 Theos 的更新脚本
+          $THEOS/bin/update-theos || true
+          # 设置 SDK 版本
+          echo "SDKVERSION=13.5" >> $GITHUB_ENV
+          echo "TARGET=iphone:latest:13.5" >> $GITHUB_ENV
 
-      - name: 安装 ldid (签名工具)
+      - name: 安装 ldid
         run: |
           brew install ldid
-          ldid --version
 
       - name: 编译插件
         run: |
@@ -52,27 +42,8 @@ jobs:
           make clean
           make FINALPACKAGE=1
 
-      - name: 查找并上传产物
-        run: |
-          echo "========== 查找编译产物 =========="
-          ls -la .theos/obj/ 2>/dev/null || echo ".theos/obj/ 不存在"
-          echo ""
-          echo "========== 查找 packages 目录 =========="
-          ls -la packages/ 2>/dev/null || echo "packages/ 不存在"
-          echo ""
-          echo "========== 查找所有 .dylib =========="
-          find . -name "*.dylib" -type f
-          echo ""
-          echo "========== 查找所有 .deb =========="
-          find . -name "*.deb" -type f
-          
-          # 创建输出目录并复制
-          mkdir -p output
-          cp -r .theos/obj/*.dylib output/ 2>/dev/null || true
-          cp -r packages/*.deb output/ 2>/dev/null || true
-
-      - name: 上传插件
+      - name: 上传 .dylib
         uses: actions/upload-artifact@v4
         with:
           name: URLRedirect_Plugin
-          path: output/
+          path: .theos/obj/*.dylib
