@@ -13,67 +13,89 @@ jobs:
       - name: 获取代码
         uses: actions/checkout@v4
       
-      - name: 安装 Theos
+      - name: 安装 Theos 到用户目录
         run: |
-          # 安装 Theos 到指定目录
-          git clone --depth 1 https://github.com/theos/theos.git /opt/theos
-          echo "export THEOS=/opt/theos" >> $GITHUB_ENV
-          echo "/opt/theos/bin" >> $GITHUB_PATH
+          # 安装到当前用户目录（有写入权限）
+          git clone --depth 1 https://github.com/theos/theos.git $HOME/theos
+          echo "$HOME/theos/bin" >> $GITHUB_PATH
+          echo "THEOS=$HOME/theos" >> $GITHUB_ENV
           
           # 下载 SDK
-          curl -L -o /opt/theos/sdks.zip https://github.com/theos/sdks/archive/master.zip
-          unzip -q /opt/theos/sdks.zip -d /opt/theos/sdks
-          mv /opt/theos/sdks/sdks-master/* /opt/theos/sdks/
-          rm -rf /opt/theos/sdks/sdks-master
+          curl -L -o $HOME/theos/sdks.zip https://github.com/theos/sdks/archive/master.zip
+          unzip -q $HOME/theos/sdks.zip -d $HOME/theos/sdks
+          mv $HOME/theos/sdks/sdks-master/* $HOME/theos/sdks/
+          rm -rf $HOME/theos/sdks/sdks-master $HOME/theos/sdks.zip
           
-          # 设置 SDK 路径
-          echo "export SDKVERSION=14.5" >> $GITHUB_ENV
-          echo "export TARGET=iphone:latest:14.0" >> $GITHUB_ENV
+          # 设置 SDK 版本
+          echo "SDKVERSION=14.5" >> $GITHUB_ENV
+          
+          echo "Theos 安装完成，路径: $HOME/theos"
+          ls -la $HOME/theos/
       
-      - name: 验证 Theos 安装
+      - name: 创建 Makefile
         run: |
-          ls -la /opt/theos/
-          ls -la /opt/theos/bin/
-          echo "THEOS=$THEOS"
-      
-      - name: 修复 Makefile
-        run: |
-          # 替换 Makefile 中的路径变量
-          sed -i 's|include $(THEOS)/makefiles/common.mk|include $(THEOS)/makefiles/common.mk|g' Makefile
-          sed -i 's|include $(THEOS_MAKE_PATH)/tweak.mk|include $(THEOS)/makefiles/tweak.mk|g' Makefile
+          cat > Makefile << 'EOF'
+          # Theos 路径
+          export THEOS = $(HOME)/theos
+          export THEOS_MAKE_PATH = $(THEOS)/makefiles
           
-          # 如果 THEOS 环境变量没有生效，直接写入 Makefile
-          echo "THEOS = /opt/theos" >> Makefile
-          echo "THEOS_MAKE_PATH = /opt/theos/makefiles" >> Makefile
+          # 架构
+          ARCHS = arm64 arm64e
           
+          # 目标 iOS 版本
+          TARGET = iphone:latest:14.0
+          
+          # 插件名称
+          TWEAK_NAME = urlredirect
+          
+          # 源文件
+          urlredirect_FILES = Tweak.xm
+          
+          # 编译标志
+          urlredirect_CFLAGS = -fobjc-arc
+          
+          # 包含 Theos 构建文件
+          include $(THEOS_MAKE_PATH)/common.mk
+          include $(THEOS_MAKE_PATH)/tweak.mk
+          EOF
+          
+          echo "Makefile 已创建"
           cat Makefile
+      
+      - name: 验证文件
+        run: |
+          echo "当前目录文件:"
+          ls -la
+          echo ""
+          echo "Tweak.xm 内容:"
+          head -20 Tweak.xm
       
       - name: 编译插件
         run: |
-          cd $GITHUB_WORKSPACE
-          export THEOS=/opt/theos
-          export THEOS_MAKE_PATH=/opt/theos/makefiles
+          export THEOS=$HOME/theos
+          export THEOS_MAKE_PATH=$HOME/theos/makefiles
+          
+          # 清理并编译
           make clean
           make FINALPACKAGE=1
       
       - name: 查找编译产物
         run: |
-          echo "查找 .dylib 文件..."
-          find . -name "*.dylib" -type f
-          echo "查找 .deb 文件..."
-          find . -name "*.deb" -type f
+          echo "查找所有 .dylib 文件..."
+          find . -name "*.dylib" -type f 2>/dev/null || echo "未找到 .dylib"
+          echo ""
+          echo "查找所有 .deb 文件..."
+          find . -name "*.deb" -type f 2>/dev/null || echo "未找到 .deb"
+          echo ""
+          echo "查找 .theos 目录..."
+          ls -la .theos/ 2>/dev/null || echo ".theos 目录不存在"
+          ls -la .theos/obj/ 2>/dev/null || echo "obj 目录不存在"
       
-      - name: 上传编译产物 (dylib)
+      - name: 上传编译产物
         uses: actions/upload-artifact@v4
         with:
-          name: URLRedirect_Plugin_dylib
+          name: URLRedirect_Plugin
           path: |
             **/*.dylib
-            !**/*.stripped*
-      
-      - name: 上传编译产物 (deb)
-        uses: actions/upload-artifact@v4
-        with:
-          name: URLRedirect_Plugin_deb
-          path: |
             **/*.deb
+            !**/*.stripped*
