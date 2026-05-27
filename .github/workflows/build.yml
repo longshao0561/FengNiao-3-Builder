@@ -1,4 +1,4 @@
-name: Build Tweak on macOS (Debug)
+name: Build Tweak on macOS
 
 on:
   push:
@@ -19,48 +19,37 @@ jobs:
           echo "THEOS=$HOME/theos" >> $GITHUB_ENV
           echo "$HOME/theos/bin" >> $GITHUB_PATH
 
-      - name: 下载 SDK 并编译
+      - name: 下载 SDK
         run: |
           export THEOS=$HOME/theos
-          
-          # 下载 SDK
           curl -L -o $THEOS/sdks.zip https://github.com/theos/sdks/archive/master.zip
           unzip -q $THEOS/sdks.zip -d $THEOS/
           mv $THEOS/sdks-master/* $THEOS/sdks/
           rm -rf $THEOS/sdks-master $THEOS/sdks.zip
           mkdir -p $THEOS/vendor/include $THEOS/vendor/lib
-          
           echo "SDKVERSION=13.5" >> $GITHUB_ENV
-          
-          # 编译
+
+      - name: 安装 ldid
+        run: |
+          brew install ldid
+
+      - name: 编译插件
+        run: |
+          export THEOS=$HOME/theos
           cd $GITHUB_WORKSPACE
           make clean
           make FINALPACKAGE=1
-          
-          # ========== 调试：列出所有文件 ==========
-          echo ""
-          echo "========== 当前目录内容 =========="
-          ls -la
-          echo ""
-          echo "========== .theos 目录内容 =========="
-          ls -la .theos/ 2>/dev/null || echo ".theos 目录不存在"
-          echo ""
-          echo "========== .theos/obj 目录内容 =========="
-          ls -la .theos/obj/ 2>/dev/null || echo ".theos/obj 目录不存在"
-          echo ""
-          echo "========== 所有 .dylib 文件 =========="
-          find . -name "*.dylib" -type f 2>/dev/null || echo "没有找到 .dylib"
-          echo ""
-          echo "========== 所有 .unsigned 文件 =========="
-          find . -name "*.unsigned" -type f 2>/dev/null || echo "没有找到 .unsigned"
-          echo ""
-          echo "========== packages 目录 =========="
-          ls -la packages/ 2>/dev/null || echo "packages 目录不存在"
 
-      - name: 上传调试信息
+      - name: 列出产物
+        run: |
+          echo "========== .theos/obj/ 内容 =========="
+          ls -la .theos/obj/ 2>/dev/null || echo "目录不存在"
+          echo ""
+          echo "========== packages 内容 =========="
+          ls -la packages/ 2>/dev/null || echo "目录不存在"
+
+      - name: 上传 .dylib
         uses: actions/upload-artifact@v4
         with:
-          name: Debug_Info
-          path: |
-            .theos/
-            packages/
+          name: URLRedirect_Plugin
+          path: .theos/obj/*.dylib
