@@ -1,0 +1,8 @@
+Package: com.your.urlredirect
+Name: URL Redirect Tweak
+Version: 1.0.0
+Architecture: iphoneos-arm
+Description: 重定向插件网络请求到自定义服务器
+Maintainer: Your Name
+Author: Your Name
+Section: Tweaks
