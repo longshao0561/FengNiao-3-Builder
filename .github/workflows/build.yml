@@ -8,23 +8,60 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
+    
     steps:
       - name: 获取代码
         uses: actions/checkout@v4
 
-      - name: 编译插件 (使用 Theos Action)
-        uses: theos/theos-action@v1
-        with:
-          package-name: URLRedirect
+      - name: 安装编译工具
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y git curl unzip build-essential libxml2-dev
 
-      - name: 上传 .deb 包
+      - name: 安装 Theos
+        run: |
+          # 克隆 Theos
+          git clone --depth 1 https://github.com/theos/theos.git /opt/theos
+          
+          # 下载 SDK
+          cd /opt/theos
+          curl -L -o sdks.zip https://github.com/theos/sdks/archive/master.zip
+          unzip -q sdks.zip
+          mv sdks-master/* sdks/
+          rm -rf sdks-master sdks.zip
+          
+          # 设置环境变量
+          echo "THEOS=/opt/theos" >> $GITHUB_ENV
+          echo "/opt/theos/bin" >> $GITHUB_PATH
+
+      - name: 验证 Theos 安装
+        run: |
+          export THEOS=/opt/theos
+          ls -la $THEOS
+          ls -la $THEOS/sdks
+
+      - name: 编译插件
+        run: |
+          export THEOS=/opt/theos
+          make clean
+          make FINALPACKAGE=1
+
+      - name: 查找编译产物
+        run: |
+          echo "查找 .dylib 文件..."
+          find . -name "*.dylib" -type f 2>/dev/null || echo "未找到 .dylib"
+          echo ""
+          echo "查找 .deb 文件..."
+          find . -name "*.deb" -type f 2>/dev/null || echo "未找到 .deb"
+          echo ""
+          echo "检查 .theos 目录..."
+          ls -la .theos/ 2>/dev/null || echo ".theos 目录不存在"
+          ls -la .theos/obj/ 2>/dev/null || echo "obj 目录不存在"
+
+      - name: 上传编译产物
         uses: actions/upload-artifact@v4
         with:
-          name: URLRedirect_Plugin_Deb
-          path: packages/*.deb
-
-      - name: 上传 .dylib 文件
-        uses: actions/upload-artifact@v4
-        with:
-          name: URLRedirect_Plugin_Dylib
-          path: .theos/obj/*.dylib
+          name: URLRedirect_Plugin
+          path: |
+            **/*.dylib
+            **/*.deb
