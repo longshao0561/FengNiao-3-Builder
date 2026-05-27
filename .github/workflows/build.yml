@@ -22,21 +22,25 @@ jobs:
       - name: 手动修复 vendor 目录
         run: |
           export THEOS=$HOME/theos
-          # 创建缺失的 vendor 目录
+          # 1. 创建缺失的目录
           mkdir -p $THEOS/vendor/include
           mkdir -p $THEOS/vendor/lib
+          mkdir -p $THEOS/sdks
           
-          # 手动下载并安装 SDK
-          curl -L -o $THEOS/sdks.zip https://github.com/theos/sdks/archive/master.zip
-          unzip -q $THEOS/sdks.zip -d $THEOS/
-          mv $THEOS/sdks-master/* $THEOS/sdks/
-          rm -rf $THEOS/sdks-master $THEOS/sdks.zip
+          # 2. 下载 iPhoneOS SDK（从 GitHub 镜像）
+          curl -L -o /tmp/iPhoneOS.sdk.zip https://github.com/xybp888/iOS-SDKs/raw/master/iPhoneOS14.5.sdk.zip
+          unzip -q /tmp/iPhoneOS.sdk.zip -d $THEOS/sdks/
           
-          # 复制 SDK 头文件到 vendor 目录
-          cp -r $THEOS/sdks/* $THEOS/vendor/ 2>/dev/null || true
+          # 3. 创建符号链接到 vendor 目录
+          ln -s $THEOS/sdks/iPhoneOS.sdk $THEOS/vendor/include
+          ln -s $THEOS/sdks/iPhoneOS.sdk $THEOS/vendor/lib
+          
+          # 4. 设置 SDK 环境变量
+          echo "SDKVERSION=14.5" >> $GITHUB_ENV
+          echo "TARGET=iphone:latest:14.0" >> $GITHUB_ENV
           
           echo "Theos 和 SDK 安装完成"
-          ls -la $THEOS/vendor/
+          ls -la $THEOS/sdks/
 
       - name: 编译插件
         run: |
