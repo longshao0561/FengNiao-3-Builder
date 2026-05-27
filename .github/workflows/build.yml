@@ -19,27 +19,32 @@ jobs:
           echo "THEOS=$HOME/theos" >> $GITHUB_ENV
           echo "$HOME/theos/bin" >> $GITHUB_PATH
 
-      - name: 手动修复 vendor 目录
+      - name: 使用官方 update-theos 修复
         run: |
           export THEOS=$HOME/theos
-          # 1. 创建缺失的目录
-          mkdir -p $THEOS/vendor/include
-          mkdir -p $THEOS/vendor/lib
-          mkdir -p $THEOS/sdks
+          # 运行官方更新脚本（会自动下载 SDK）
+          $THEOS/bin/update-theos
+          # 如果失败，尝试用 make
+          cd $THEOS
+          make update-theos || true
+
+      - name: 手动下载可用的 SDK
+        run: |
+          export THEOS=$HOME/theos
+          # 使用 GitHub 上可用的 SDK 源
+          curl -L -o $THEOS/sdks.zip https://github.com/theos/sdks/archive/master.zip
+          unzip -q $THEOS/sdks.zip -d $THEOS/
+          mv $THEOS/sdks-master/* $THEOS/sdks/
+          rm -rf $THEOS/sdks-master $THEOS/sdks.zip
           
-          # 2. 下载 iPhoneOS SDK（从 GitHub 镜像）
-          curl -L -o /tmp/iPhoneOS.sdk.zip https://github.com/xybp888/iOS-SDKs/raw/master/iPhoneOS14.5.sdk.zip
-          unzip -q /tmp/iPhoneOS.sdk.zip -d $THEOS/sdks/
+          # 创建 vendor 目录
+          mkdir -p $THEOS/vendor/include $THEOS/vendor/lib
           
-          # 3. 创建符号链接到 vendor 目录
-          ln -s $THEOS/sdks/iPhoneOS.sdk $THEOS/vendor/include
-          ln -s $THEOS/sdks/iPhoneOS.sdk $THEOS/vendor/lib
+          # 设置 SDK 版本
+          echo "SDKVERSION=13.5" >> $GITHUB_ENV
+          echo "TARGET=iphone:latest:13.5" >> $GITHUB_ENV
           
-          # 4. 设置 SDK 环境变量
-          echo "SDKVERSION=14.5" >> $GITHUB_ENV
-          echo "TARGET=iphone:latest:14.0" >> $GITHUB_ENV
-          
-          echo "Theos 和 SDK 安装完成"
+          echo "SDK 安装完成"
           ls -la $THEOS/sdks/
 
       - name: 编译插件
