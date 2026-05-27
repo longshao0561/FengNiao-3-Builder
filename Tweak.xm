@@ -2,11 +2,11 @@
 #import <Foundation/Foundation.h>
 
 // ============================================
-// URL 重定向插件 - 将插件服务器请求指向你自己的服务器
+// ！！！重要：修改这里为你的服务器地址 ！！！
+// ============================================
+#define MY_SERVER "http://43.139.221.5:3000"
 // ============================================
 
-// 你的服务器地址（修改这里！）
-#define MY_SERVER "http://43.139.221.5:3000"
 #define ORIGINAL_SERVER1 "http://api1.7ccccccc.com"
 #define ORIGINAL_SERVER2 "http://api2.7ccccccc.com"
 #define ORIGINAL_SERVER3 "http://api3.7ccccccc.com"
