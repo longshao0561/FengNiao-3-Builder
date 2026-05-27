@@ -5,8 +5,10 @@ TWEAK_NAME = urlredirect
 urlredirect_FILES = Tweak.xm
 urlredirect_CFLAGS = -fobjc-arc
 
-# 禁用签名（全能签注入时会重新签名）
-CODESIGN = false
+# 强制禁用签名
+export CODESIGN = false
+export CODESIGN_ALLOC = false
+TARGET_CODESIGN = false
 
 include $(THEOS)/makefiles/common.mk
 include $(THEOS)/makefiles/tweak.mk
