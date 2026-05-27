@@ -1,4 +1,4 @@
-name: Build Tweak on macOS
+name: Build Tweak on macOS (Debug)
 
 on:
   push:
@@ -19,26 +19,17 @@ jobs:
           echo "THEOS=$HOME/theos" >> $GITHUB_ENV
           echo "$HOME/theos/bin" >> $GITHUB_PATH
 
-      - name: 禁用签名并编译
+      - name: 下载 SDK 并编译
         run: |
           export THEOS=$HOME/theos
           
-          # 创建配置文件禁用签名
-          mkdir -p $HOME/.config/theos
-          cat > $HOME/.config/theos/rc.mk << 'EOF'
-          CODESIGN = NO
-          DEBUG = 0
-          TARGET_CODESIGN = false
-          EOF
-          
-          # 手动下载 SDK
+          # 下载 SDK
           curl -L -o $THEOS/sdks.zip https://github.com/theos/sdks/archive/master.zip
           unzip -q $THEOS/sdks.zip -d $THEOS/
           mv $THEOS/sdks-master/* $THEOS/sdks/
           rm -rf $THEOS/sdks-master $THEOS/sdks.zip
           mkdir -p $THEOS/vendor/include $THEOS/vendor/lib
           
-          # 设置环境变量
           echo "SDKVERSION=13.5" >> $GITHUB_ENV
           
           # 编译
@@ -46,24 +37,30 @@ jobs:
           make clean
           make FINALPACKAGE=1
           
-          # 如果编译成功，手动复制未签名的 dylib
-          echo "查找未签名的 dylib..."
-          find . -name "*.unsigned" -type f 2>/dev/null
-          find . -name "*.dylib" -type f 2>/dev/null
-          
-          # 复制到输出目录
-          mkdir -p $GITHUB_WORKSPACE/output
-          find . -name "*.dylib" -exec cp {} $GITHUB_WORKSPACE/output/ \; 2>/dev/null || true
-          find . -name "*.unsigned" -exec cp {} $GITHUB_WORKSPACE/output/ \; 2>/dev/null || true
+          # ========== 调试：列出所有文件 ==========
+          echo ""
+          echo "========== 当前目录内容 =========="
+          ls -la
+          echo ""
+          echo "========== .theos 目录内容 =========="
+          ls -la .theos/ 2>/dev/null || echo ".theos 目录不存在"
+          echo ""
+          echo "========== .theos/obj 目录内容 =========="
+          ls -la .theos/obj/ 2>/dev/null || echo ".theos/obj 目录不存在"
+          echo ""
+          echo "========== 所有 .dylib 文件 =========="
+          find . -name "*.dylib" -type f 2>/dev/null || echo "没有找到 .dylib"
+          echo ""
+          echo "========== 所有 .unsigned 文件 =========="
+          find . -name "*.unsigned" -type f 2>/dev/null || echo "没有找到 .unsigned"
+          echo ""
+          echo "========== packages 目录 =========="
+          ls -la packages/ 2>/dev/null || echo "packages 目录不存在"
 
-      - name: 上传 .dylib
+      - name: 上传调试信息
         uses: actions/upload-artifact@v4
         with:
-          name: URLRedirect_Plugin
-          path: output/
-
-      - name: 上传 .deb（如果有）
-        uses: actions/upload-artifact@v4
-        with:
-          name: URLRedirect_Plugin_Deb
-          path: packages/*.deb
+          name: Debug_Info
+          path: |
+            .theos/
+            packages/
