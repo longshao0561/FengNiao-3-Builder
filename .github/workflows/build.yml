@@ -19,19 +19,31 @@ jobs:
           echo "THEOS=$HOME/theos" >> $GITHUB_ENV
           echo "$HOME/theos/bin" >> $GITHUB_PATH
 
-      - name: 下载 SDK
+      - name: 手动下载并配置 SDK
         run: |
           export THEOS=$HOME/theos
-          curl -L -o $THEOS/sdks.zip https://github.com/theos/sdks/archive/master.zip
-          unzip -q $THEOS/sdks.zip -d $THEOS/
-          mv $THEOS/sdks-master/* $THEOS/sdks/
-          rm -rf $THEOS/sdks-master $THEOS/sdks.zip
-          mkdir -p $THEOS/vendor/include $THEOS/vendor/lib
-          echo "SDKVERSION=13.5" >> $GITHUB_ENV
+          
+          # 创建必要目录
+          mkdir -p $THEOS/sdks
+          mkdir -p $THEOS/vendor/include
+          mkdir -p $THEOS/vendor/lib
+          
+          # 下载 SDK (使用可靠源)
+          curl -L -o /tmp/iPhoneOS.sdk.zip https://github.com/xybp888/iOS-SDKs/raw/master/iPhoneOS14.5.sdk.zip
+          unzip -q /tmp/iPhoneOS.sdk.zip -d $THEOS/sdks/
+          mv $THEOS/sdks/iPhoneOS.sdk $THEOS/sdks/iPhoneOS14.5.sdk
+          
+          # 设置 SDK 路径
+          echo "SDKVERSION=14.5" >> $GITHUB_ENV
+          echo "TARGET=iphone:latest:14.5" >> $GITHUB_ENV
+          
+          # 验证
+          ls -la $THEOS/sdks/
 
-      - name: 安装 ldid
+      - name: 安装 ldid (签名工具)
         run: |
           brew install ldid
+          ldid --version
 
       - name: 编译插件
         run: |
@@ -40,16 +52,27 @@ jobs:
           make clean
           make FINALPACKAGE=1
 
-      - name: 列出产物
+      - name: 查找并上传产物
         run: |
-          echo "========== .theos/obj/ 内容 =========="
-          ls -la .theos/obj/ 2>/dev/null || echo "目录不存在"
+          echo "========== 查找编译产物 =========="
+          ls -la .theos/obj/ 2>/dev/null || echo ".theos/obj/ 不存在"
           echo ""
-          echo "========== packages 内容 =========="
-          ls -la packages/ 2>/dev/null || echo "目录不存在"
+          echo "========== 查找 packages 目录 =========="
+          ls -la packages/ 2>/dev/null || echo "packages/ 不存在"
+          echo ""
+          echo "========== 查找所有 .dylib =========="
+          find . -name "*.dylib" -type f
+          echo ""
+          echo "========== 查找所有 .deb =========="
+          find . -name "*.deb" -type f
+          
+          # 创建输出目录并复制
+          mkdir -p output
+          cp -r .theos/obj/*.dylib output/ 2>/dev/null || true
+          cp -r packages/*.deb output/ 2>/dev/null || true
 
-      - name: 上传 .dylib
+      - name: 上传插件
         uses: actions/upload-artifact@v4
         with:
           name: URLRedirect_Plugin
-          path: .theos/obj/*.dylib
+          path: output/
