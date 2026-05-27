@@ -16,29 +16,49 @@ jobs:
       - name: 安装编译工具
         run: |
           sudo apt-get update
-          sudo apt-get install -y git curl unzip build-essential libxml2-dev
+          sudo apt-get install -y git curl unzip build-essential
 
       - name: 安装 Theos
         run: |
           # 克隆 Theos
           git clone --depth 1 https://github.com/theos/theos.git /opt/theos
-          
-          # 下载 SDK
-          cd /opt/theos
-          curl -L -o sdks.zip https://github.com/theos/sdks/archive/master.zip
-          unzip -q sdks.zip
-          mv sdks-master/* sdks/
-          rm -rf sdks-master sdks.zip
-          
-          # 设置环境变量
           echo "THEOS=/opt/theos" >> $GITHUB_ENV
           echo "/opt/theos/bin" >> $GITHUB_PATH
+
+      - name: 运行 update-theos 补全文件
+        run: |
+          export THEOS=/opt/theos
+          # 运行更新脚本
+          /opt/theos/bin/update-theos
+          # 如果上面命令失败，尝试用 make 更新
+          cd /opt/theos
+          make update-theos || true
+
+      - name: 手动下载 SDK（如果 update-theos 失败）
+        run: |
+          export THEOS=/opt/theos
+          # 手动下载 SDK
+          curl -L -o /tmp/sdks.zip https://github.com/theos/sdks/archive/master.zip
+          unzip -q /tmp/sdks.zip -d /tmp/
+          mkdir -p $THEOS/sdks
+          cp -r /tmp/sdks-master/* $THEOS/sdks/
+          rm -rf /tmp/sdks-master /tmp/sdks.zip
+          # 创建 vendor 目录
+          mkdir -p $THEOS/vendor/include $THEOS/vendor/lib
+          echo "SDK 安装完成"
+          ls -la $THEOS/sdks/
 
       - name: 验证 Theos 安装
         run: |
           export THEOS=/opt/theos
-          ls -la $THEOS
-          ls -la $THEOS/sdks
+          echo "THEOS 目录内容:"
+          ls -la $THEOS/
+          echo ""
+          echo "SDK 目录内容:"
+          ls -la $THEOS/sdks/ || echo "SDK 目录不存在"
+          echo ""
+          echo "vendor 目录内容:"
+          ls -la $THEOS/vendor/ || echo "vendor 目录不存在"
 
       - name: 编译插件
         run: |
